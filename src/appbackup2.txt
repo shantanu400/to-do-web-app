@@ -8,17 +8,18 @@ import { BrowserRouter, Routes, Route, useAsyncError } from "react-router-dom";
 import Login from "./Mycomp/Login";
 import Update from "./Mycomp/Update";
 import SignUp from "./Mycomp/SignUp";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import { signOut } from "firebase/auth";
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
 import PrivateRoute from "./Mycomp/PrivateRoute";
 
 function App() {
-  let initTodo;
-  if (localStorage.getItem("todos") === null) {
-    initTodo = [];
-  } else {
-    initTodo = JSON.parse(localStorage.getItem("todos"));
-  }
+  const [todos, settodos] = useState([]);
+  const [Reqsearch, setReqsearch] = useState("");
+  const [SnoToUdate, setSnoToUdate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isUserloggedin, setIsuserloggedin] = useState(false);
+  const [Username, setUsername] = useState("");
 
   const login = (Username, Password) => {
     console.log(Username);
@@ -30,68 +31,68 @@ function App() {
     console.log(Password);
   };
 
-  const onDelete = (todo) => {
-    settodos(
-      todos.filter((e) => {
-        return e !== todo;
-      })
-    );
-    localStorage.getItem("todos");
-  };
-
-  const onUpdate = (sno, title, desc) => {
-    console.log("in onUpdate");
-    let newTodos = todos.map((todo) => {
-      if (todo.sno === sno) {
-        todo.title = title;
-        todo.desc = desc;
-        return todo;
-      } else return todo;
-    });
-    console.log(sno, title, desc);
-    settodos(newTodos);
-  };
-
-  const addtodo = (title, desc) => {
-    let sno;
-    if (todos.length == 0) {
-      sno = 1;
-    } else {
-      sno = todos[todos.length - 1].sno + 1;
+  const onDelete = async (todo) => {
+    try {
+      await deleteDoc(doc(collection(db, 'users', auth.currentUser.uid, 'todos'), todo.id));
+      settodos(todos.filter((e) => e !== todo));
+    } catch (error) {
+      console.error('Error deleting todo: ', error);
     }
+  };
 
-    const mytodo = {
-      sno: sno,
-      title: title,
-      desc: desc,
-    };
+  const onUpdate = async (sno, title, desc) => {
+    try {
+      await updateDoc(doc(collection(db, 'users', auth.currentUser.uid, 'todos'), sno), { title, desc });
+      settodos(todos.map((todo) => (todo.sno === sno ? { ...todo, title, desc } : todo)));
+    } catch (error) {
+      console.error('Error updating todo: ', error);
+    }
+  };
 
-    settodos([...todos, mytodo]);
+  const addtodo = async (title, desc) => {
+    try {
+      const sno = todos.length === 0 ? 1 : todos[todos.length - 1].sno + 1;
+      const newTodo = { sno, title, desc };
+      await setDoc(doc(collection(db, 'users', auth.currentUser.uid, 'todos'), sno.toString()), newTodo);
+      settodos([...todos, newTodo]);
+    } catch (error) {
+      console.error('Error adding todo: ', error);
+    }
   };
 
   const search = (Reqsearch) => {
     setReqsearch(Reqsearch);
   };
 
-  const [todos, settodos] = useState(initTodo);
-  const [Reqsearch, setReqsearch] = useState("");
-  const [SnoToUdate, setSnoToUdate] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isUserloggedin, setIsuserloggedin] = useState(false);
-  const [Username, setUsername] = useState("");
-
-  useEffect(() => {
-    localStorage.setItem("todos", JSON.stringify(todos));
-  }, [todos]);
+  const signOutUser = () => {
+    signOut(auth).then(() => {
+      alert("Sign Out Succesful");
+      setIsuserloggedin(false);
+      setUsername("Default");
+    });
+  };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setIsuserloggedin(true);
         setUsername(user.displayName);
+        // Load user todos from Firestore
+        try {
+          const q = query(collection(db, 'users', auth.currentUser.uid, 'todos'));
+          const querySnapshot =  getDocs(q);
+          const userTodos = [];
+          querySnapshot.forEach((doc) => {
+            userTodos.push({ id: doc.id, ...doc.data() });
+          });
+          settodos(userTodos);
+        } catch (error) {
+          console.error('Error loading user todos: ', error);
+        }
       } else {
         setIsuserloggedin(false);
         setUsername("");
+        settodos([]);
       }
       setLoading(false); // Set loading to false after checking auth state
     });
@@ -102,14 +103,6 @@ function App() {
   if (loading) {
     return <div>Loading...</div>; // Show loading spinner or placeholder content
   }
-
-  const signOutUser = () => {
-    signOut(auth).then(() => {
-      alert("Sign Out Succesful");
-      setIsuserloggedin(false);
-      setUsername("Default");
-    });
-  };
 
   return (
     <>
