@@ -55,7 +55,8 @@ export default function Login() {
             id="desc"
           />
         </div>
-        <button type="submit" className="btn btn-success" disabled={loading}>
+        <button type="submit" className="btn btn-success" disabled={loading}> 
+        {/* disabled={loading}: button will be disabled when the loading state/prop is true */}
             {/* Below is used loading to show status of logging in or logged in */}
           {loading ? "logging in..." : "log in"}  
         </button>

@@ -20,8 +20,8 @@ export default function SignUp() {
             alert('Sign Up Succesful, Please Refresh the page')
             console.log(userCredential);
             const user = userCredential.user;
-            await updateProfile(user, { displayName: email });
-            console.log(user);
+            await updateProfile(user, { displayName: email }); //update profile is predefined function in firebase
+            
             navigate('/'); // Corrected to use navigate hook
         } catch (error) {
             alert(error.message); // Simplified alert
